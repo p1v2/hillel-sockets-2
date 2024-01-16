@@ -1,0 +1,44 @@
+<html>
+<head>
+    <title>Chat</title>
+</head>
+<body>
+   <h1 id="room-name"> {{ room_name|json_script:"room-name" }} </h1>
+   <p>Message log</p>
+   <textarea id="chat-log" cols="100" rows="20"></textarea><br>
+   <p>Input your name</p>
+   <input id="name" size="100"><br>
+   <p>Input your message</p>
+   <input id="chat-message-input" type="text" size="100"><br>
+    <button id="chat-message-submit">Send</button>
+
+    <script>
+        const roomName = JSON.parse(document.getElementById('room-name').textContent)
+
+        const chatSocket = new WebSocket(`ws://localhost:8000/chat/${roomName}/`)
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            document.querySelector('#chat-log').value += (data.name + ": " + data.message + '\n')
+        }
+        chatSocket.onerror = function(e) {
+            console.log(e)
+        }
+
+        document.querySelector('#chat-message-submit').onclick = function(e) {
+            const messageInputDom = document.querySelector('#chat-message-input')
+            const message = messageInputDom.value
+
+            const nameInputDom = document.querySelector('#name')
+            const name = nameInputDom.value
+
+            chatSocket.send(JSON.stringify({
+                'message': message,
+                'room': roomName,
+                'name': name
+            }));
+            messageInputDom.value = ''
+        }
+    </script>
+</body>
+</html>
