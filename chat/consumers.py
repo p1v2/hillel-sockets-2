@@ -1,4 +1,5 @@
 import json
+import json
 
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
@@ -24,25 +25,27 @@ class ChatConsumer(WebsocketConsumer):
             self.channel_name,
         )
 
-    def receive(self, text_data=None, bytes_data=None):
-        print("Received message: ", text_data)
-
+    async def receive(self,text_data=None, bytes_data=None):
         data = text_data or bytes_data
+        data = json.loads(data)
+        message = data['message']
+        room = data['room']
+        send_all = data.get('send_all', False)  # По умолчанию False, если ключ не существует
 
-        json_data = json.loads(data)
+        # Отправить сообщение всем подключенным пользователям в комнате
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'name': self.scope['user'].username,
+        }), room=room)
 
-        message = json_data["message"]
-        name = json_data["name"]
-
-        async_to_sync(self.channel_layer.group_send)(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': message,
-                'name': name,
-            }
-        )
-
+        # Если установлен флаг "Отправить все", отправить сообщение всем подключенным пользователям в других комнатах
+        if send_all:
+            await self.channel_layer.group_add(room, self.channel_name)
+            await self.channel_layer.group_discard(room, self.channel_name)
+            await self.send(text_data=json.dumps({
+                'message': f'Send all: {message}',
+                'name': {self.scope['user'].username},  # Имя отправителя
+            }))
     def chat_message(self, event):
         message = event['message']
         name = event['name']
