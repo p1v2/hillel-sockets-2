@@ -3,19 +3,20 @@
     <title>Chat</title>
 </head>
 <body>
-   <h1 id="room-name"> {{ room_name|json_script:"room-name" }} </h1>
-   <p>Message log</p>
-   <textarea id="chat-log" cols="100" rows="20"></textarea><br>
-   <p>Input your name</p>
-   <input id="name" size="100"><br>
-   <p>Input your message</p>
-   <input id="chat-message-input" type="text" size="100"><br>
-    <button id="chat-message-submit">Send</button>
+    <h1 id="room-name"> {{ room_name|json_script:"room-name" }} </h1>
+    <p>Message log</p>
+    <textarea id="chat-log" cols="100" rows="20" readonly></textarea><br>
+    <p>Input your name</p>
+    <input id="name" size="100"><br>
+    <p>Input your message</p>
+    <input id="chat-message-input" type="text" size="100" onkeydown="handleSubmitKeys(event)"><br/>
+    <button id="chat-message-submit" onclick="sendMessage()">Send</button>
+    <button id="chat-message-submit-all" onclick="sendMessage(true)">Send To All</button>
 
     <script>
         const roomName = JSON.parse(document.getElementById('room-name').textContent)
 
-        const chatSocket = new WebSocket(`ws://localhost:8000/chat/${roomName}/`)
+        const chatSocket = new WebSocket(`ws://localhost:8001/chat/${roomName}/`)
 
         chatSocket.onmessage = function(e) {
             const data = JSON.parse(e.data);
@@ -25,8 +26,9 @@
             console.log(e)
         }
 
-        document.querySelector('#chat-message-submit').onclick = function(e) {
-            const messageInputDom = document.querySelector('#chat-message-input')
+        const messageInputDom = document.querySelector('#chat-message-input')
+
+        function sendMessage(toAll = false) {
             const message = messageInputDom.value
 
             const nameInputDom = document.querySelector('#name')
@@ -35,9 +37,16 @@
             chatSocket.send(JSON.stringify({
                 'message': message,
                 'room': roomName,
-                'name': name
+                'name': name,
+                'send_to_all': toAll,
             }));
             messageInputDom.value = ''
+        }
+
+        function handleSubmitKeys(e) {
+            if (e.keyCode == 13) {
+                sendMessage(e.shiftKey);
+            }
         }
     </script>
 </body>

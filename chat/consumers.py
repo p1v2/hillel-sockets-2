@@ -5,6 +5,8 @@ from channels.generic.websocket import WebsocketConsumer
 
 
 class ChatConsumer(WebsocketConsumer):
+    GROUP_ALL = "ALL"
+
     def connect(self):
         print("New client connected")
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
@@ -12,6 +14,11 @@ class ChatConsumer(WebsocketConsumer):
 
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,
+            self.channel_name
+        )
+
+        async_to_sync(self.channel_layer.group_add)(
+            self.GROUP_ALL,
             self.channel_name
         )
 
@@ -34,8 +41,13 @@ class ChatConsumer(WebsocketConsumer):
         message = json_data["message"]
         name = json_data["name"]
 
+        group_name = self.room_group_name
+
+        if json_data.get("send_to_all", False):
+            group_name = self.GROUP_ALL
+
         async_to_sync(self.channel_layer.group_send)(
-            self.room_group_name,
+            group_name,
             {
                 'type': 'chat_message',
                 'message': message,
