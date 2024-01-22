@@ -43,7 +43,7 @@ class ChatConsumer(WebsocketConsumer):
 
         group_name = self.room_group_name
 
-        if json_data.get("send_to_all", False):
+        if json_data.get("room") == self.GROUP_ALL:
             group_name = self.GROUP_ALL
 
         async_to_sync(self.channel_layer.group_send)(

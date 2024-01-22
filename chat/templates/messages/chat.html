@@ -36,9 +36,8 @@
 
             chatSocket.send(JSON.stringify({
                 'message': message,
-                'room': roomName,
+                'room': (toAll ? 'ALL' : roomName),
                 'name': name,
-                'send_to_all': toAll,
             }));
             messageInputDom.value = ''
         }
