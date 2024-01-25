@@ -1,11 +1,12 @@
 import json
-import json
 
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 
 
 class ChatConsumer(WebsocketConsumer):
+    GROUP_ALL = "ALL"
+
     def connect(self):
         print("New client connected")
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
@@ -13,6 +14,11 @@ class ChatConsumer(WebsocketConsumer):
 
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,
+            self.channel_name
+        )
+
+        async_to_sync(self.channel_layer.group_add)(
+            self.GROUP_ALL,
             self.channel_name
         )
 
@@ -25,27 +31,30 @@ class ChatConsumer(WebsocketConsumer):
             self.channel_name,
         )
 
-    async def receive(self,text_data=None, bytes_data=None):
+    def receive(self, text_data=None, bytes_data=None):
+        print("Received message: ", text_data)
+
         data = text_data or bytes_data
-        data = json.loads(data)
-        message = data['message']
-        room = data['room']
-        send_all = data.get('send_all', False)  # По умолчанию False, если ключ не существует
 
-        # Отправить сообщение всем подключенным пользователям в комнате
-        await self.send(text_data=json.dumps({
-            'message': message,
-            'name': self.scope['user'].username,
-        }), room=room)
+        json_data = json.loads(data)
 
-        # Если установлен флаг "Отправить все", отправить сообщение всем подключенным пользователям в других комнатах
-        if send_all:
-            await self.channel_layer.group_add(room, self.channel_name)
-            await self.channel_layer.group_discard(room, self.channel_name)
-            await self.send(text_data=json.dumps({
-                'message': f'Send all: {message}',
-                'name': {self.scope['user'].username},  # Имя отправителя
-            }))
+        message = json_data["message"]
+        name = json_data["name"]
+
+        group_name = self.room_group_name
+
+        if json_data.get("room") == self.GROUP_ALL:
+            group_name = self.GROUP_ALL
+
+        async_to_sync(self.channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'chat_message',
+                'message': message,
+                'name': name,
+            }
+        )
+
     def chat_message(self, event):
         message = event['message']
         name = event['name']
