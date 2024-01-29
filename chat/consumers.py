@@ -26,7 +26,6 @@ class ChatConsumer(WebsocketConsumer):
 
     def receive(self, text_data=None, bytes_data=None):
         print("Received message: ", text_data)
-
         data = text_data or bytes_data
 
         json_data = json.loads(data)
