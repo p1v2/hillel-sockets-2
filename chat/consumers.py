@@ -15,6 +15,11 @@ class ChatConsumer(WebsocketConsumer):
             self.channel_name
         )
 
+        async_to_sync(self.channel_layer.group_add)(
+            'all',
+            self.channel_name
+        )
+
         self.accept()
 
     def disconnect(self, code):
@@ -26,16 +31,17 @@ class ChatConsumer(WebsocketConsumer):
 
     def receive(self, text_data=None, bytes_data=None):
         print("Received message: ", text_data)
-
         data = text_data or bytes_data
 
         json_data = json.loads(data)
 
         message = json_data["message"]
         name = json_data["name"]
+        all = json_data.get('all')
+        group_name = self.room_group_name if not all else 'all'
 
         async_to_sync(self.channel_layer.group_send)(
-            self.room_group_name,
+            group_name,
             {
                 'type': 'chat_message',
                 'message': message,
