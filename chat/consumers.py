@@ -1,50 +1,90 @@
+from channels.generic.websocket import AsyncWebsocketConsumer
 import json
 
-from asgiref.sync import async_to_sync
-from channels.generic.websocket import WebsocketConsumer
 
+class ChatConsumer(AsyncWebsocketConsumer):
+    # List of all active groups
+    active_groups = []
+    # List of all connected users
+    connected_users = []
 
-class ChatConsumer(WebsocketConsumer):
-    def connect(self):
-        print("New client connected")
-        self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
-        self.room_group_name = "chat_" + self.room_name
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.room_name = None
+        self.room_group_name = None
 
-        async_to_sync(self.channel_layer.group_add)(
+    async def connect(self):
+        self.room_name = self.scope['url_route']['kwargs']['room_name']
+        self.room_group_name = 'chat_%s' % self.room_name
+
+        # Add the group to the list of active groups
+        if self.room_group_name not in self.active_groups:
+            self.active_groups.append(self.room_group_name)
+
+        # Add the user to the list of connected users
+        if self not in self.connected_users:
+            self.connected_users.append(self)
+
+        # Join room group
+        await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
 
-        self.accept()
+        await self.accept()
 
-    def disconnect(self, code):
-        print("Client disconnected")
-        async_to_sync(self.channel_layer.group_discard)(
+    async def disconnect(self, close_code):
+        # Remove the group from the list of active groups
+        if self.room_group_name in self.active_groups:
+            self.active_groups.remove(self.room_group_name)
+
+        # Remove the user from the list of connected users
+        if self in self.connected_users:
+            self.connected_users.remove(self)
+
+        # Leave room group
+        await self.channel_layer.group_discard(
             self.room_group_name,
-            self.channel_name,
+            self.channel_name
         )
 
-    def receive(self, text_data=None, bytes_data=None):
-        print("Received message: ", text_data)
+    # Receive message from WebSocket
+    async def receive(self, text_data=None, bytes_data=None):
+        if text_data:
+            text_data_json = json.loads(text_data)
+            message = text_data_json['message']
+            name = text_data_json['name']
+            broadcast_flag = text_data_json['broadcast_flag']
 
-        data = text_data or bytes_data
+            # If broadcast_flag is True, send the message to all users
+            if broadcast_flag:
+                for user in self.connected_users:
+                    await user.send(text_data=json.dumps({
+                        'message': message,
+                        'name': name,
+                        'broadcast_flag': broadcast_flag
+                    }))
+            # Otherwise, send the message to the current group
+            else:
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'chat_message',
+                        'message': message,
+                        'name': name,
+                        'broadcast_flag': broadcast_flag
+                    }
+                )
 
-        json_data = json.loads(data)
-
-        message = json_data["message"]
-        name = json_data["name"]
-
-        async_to_sync(self.channel_layer.group_send)(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': message,
-                'name': name,
-            }
-        )
-
-    def chat_message(self, event):
+    # Receive message from room group
+    async def chat_message(self, event):
         message = event['message']
         name = event['name']
+        broadcast_flag = event['broadcast_flag']
 
-        self.send(text_data=json.dumps({"message": message, "name": name}))
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'name': name,
+            'broadcast_flag': broadcast_flag
+        }))
