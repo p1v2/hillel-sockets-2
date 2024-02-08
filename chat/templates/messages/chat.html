@@ -1,44 +1,109 @@
+<!DOCTYPE html>
 <html>
 <head>
-    <title>Chat</title>
+    <title>Chat Room</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        #roomDisplay, #nameInput, #messageInput, #chat-message-submit, #chat-message-submit-all, #chat-message-input {
+            width: 16.66%;  /* 1/6 of the page width */
+            padding: 10px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        #chat-message-input {
+            height: 300px;
+            border: 1px solid #ccc;
+            overflow-y: scroll;
+        }
+        #chat-message-submit, #chat-message-submit-all {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        #chat-message-submit:hover, #chat-message-submit-all:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-   <h1 id="room-name"> {{ room_name|json_script:"room-name" }} </h1>
-   <p>Message log</p>
-   <textarea id="chat-log" cols="100" rows="20"></textarea><br>
-   <p>Input your name</p>
-   <input id="name" size="100"><br>
-   <p>Input your message</p>
-   <input id="chat-message-input" type="text" size="100"><br>
-    <button id="chat-message-submit">Send</button>
-
-    <script>
-        const roomName = JSON.parse(document.getElementById('room-name').textContent)
-
-        const chatSocket = new WebSocket(`ws://localhost:8000/chat/${roomName}/`)
-
-        chatSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            document.querySelector('#chat-log').value += (data.name + ": " + data.message + '\n')
-        }
-        chatSocket.onerror = function(e) {
-            console.log(e)
-        }
-
-        document.querySelector('#chat-message-submit').onclick = function(e) {
-            const messageInputDom = document.querySelector('#chat-message-input')
-            const message = messageInputDom.value
-
-            const nameInputDom = document.querySelector('#name')
-            const name = nameInputDom.value
-
-            chatSocket.send(JSON.stringify({
-                'message': message,
-                'room': roomName,
-                'name': name
-            }));
-            messageInputDom.value = ''
-        }
-    </script>
+    <input id="roomDisplay" type="text" placeholder="Room" disabled><br>
+    <textarea id="chat-message-input" rows="5" cols="50" placeholder="Chat log" disabled></textarea><br>
+    <input id="nameInput" type="text" placeholder="Enter your name" disabled><br>
+    <textarea id="messageInput" rows="2" cols="50" placeholder="Enter your message" disabled></textarea><br>
+    <input id="chat-message-submit" type="button" value="Send" disabled><br>
+    <input id="chat-message-submit-all" type="button" value="SendAll" disabled>
 </body>
+
+<script>
+    const nameInput = document.querySelector('#nameInput');
+    const roomDisplay = document.querySelector('#roomDisplay');
+    const chatMessageInput = document.querySelector('#chat-message-input');
+    const messageInput = document.querySelector('#messageInput');
+    const chatMessageSubmit = document.querySelector('#chat-message-submit');
+    const chatMessageSubmitAll = document.querySelector('#chat-message-submit-all');
+    let socket;
+
+    let roomValue = window.location.pathname.split('/')[2];  // Extract room name from URL
+    roomDisplay.value = roomValue;  // Display room name in disabled input field
+
+    socket = new WebSocket('ws://' + window.location.host + '/chat/' + roomValue + '/');
+    chatMessageInput.disabled = false;
+    nameInput.disabled = false;
+    messageInput.disabled = false;
+    chatMessageSubmit.disabled = false;
+    chatMessageSubmitAll.disabled = false;
+
+    socket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        chatMessageInput.value += (data.name + ': ' + data.message + '\n');
+    };
+
+    socket.onclose = function(e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+
+    chatMessageSubmit.onclick = function(e) {
+        const message = messageInput.value;
+        const name = nameInput.value;
+        socket.send(JSON.stringify({
+            'message': message,
+            'name': name,
+            'broadcast_flag': false
+        }));
+        messageInput.value = '';
+    };
+
+    chatMessageSubmitAll.onclick = function(e) {
+        const message = messageInput.value;
+        const name = nameInput.value;
+        socket.send(JSON.stringify({
+            'message': message,
+            'name': name,
+            'broadcast_flag': true
+        }));
+        messageInput.value = '';
+    };
+
+    function checkInput() {
+        if (nameInput.value && messageInput.value) {
+            chatMessageSubmit.disabled = false;
+            chatMessageSubmitAll.disabled = false;
+        } else {
+            chatMessageSubmit.disabled = true;
+            chatMessageSubmitAll.disabled = true;
+        }
+    }
+
+    nameInput.addEventListener('input', checkInput);
+    messageInput.addEventListener('input', checkInput);
+
+    // Call checkInput to initialize button state
+    checkInput();
+</script>
+
 </html>
