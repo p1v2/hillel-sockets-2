@@ -11,6 +11,7 @@
    <p>Input your message</p>
    <input id="chat-message-input" type="text" size="100"><br>
     <button id="chat-message-submit">Send</button>
+    <button id="send-all-button">Send All!</button>
 
     <script>
         const roomName = JSON.parse(document.getElementById('room-name').textContent)
@@ -33,12 +34,26 @@
             const name = nameInputDom.value
 
             chatSocket.send(JSON.stringify({
+                'action': 'send_message',
                 'message': message,
                 'room': roomName,
                 'name': name
             }));
             messageInputDom.value = ''
         }
+        document.querySelector('#send-all-button').onclick = function (e) {
+            const messageInputDom = document.querySelector('#chat-message-input'):
+            const message = messageInputDom.value;
+            const name = document.querySelector('#name').value;
+
+            chatSocket.send(JSON.stringify({
+                'action': 'send_all',
+                'message': message,
+                'name': name
+            }));
+
+            messageInputDom.value = '';
+        };
     </script>
 </body>
 </html>
